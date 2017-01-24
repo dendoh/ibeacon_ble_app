@@ -17,18 +17,22 @@ import org.eclipse.paho.client.mqttv3.IMqttActionListener;
 import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
-
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 import java.io.ByteArrayInputStream;
+import java.io.UnsupportedEncodingException;
 import java.util.List;
+import java.lang.StringBuilder;
+import java.lang.String;
 
 public class MainActivity extends AppCompatActivity {
 
     private BluetoothAdapter mBluetoothAdapter;
     private Handler mHandler;
     final String TAG = "iBeaconBLE";
+    final String topic = "test";
     private String clientID = MqttClient.generateClientId();
-    private MqttAndroidClient client = new MqttAndroidClient(this.getApplicationContext(), "tcp://broker.xx:1234", clientID);
+    private MqttAndroidClient client = new MqttAndroidClient(MainActivity.this, "tcp://192.168.1.238:1883", clientID);
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -121,6 +125,16 @@ public class MainActivity extends AppCompatActivity {
         public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
             Log.d(TAG, "Found device " + device.toString() + "," + "rssi= "+rssi);
             Log.d(TAG, "scanRecord:" + bytesToHex(scanRecord));
+            try {
+                String payload = "Device:" + device.toString() + "payload:" + bytesToHex(scanRecord);
+                MqttMessage message = new MqttMessage("test payload".getBytes());
+                client.publish(topic, message);
+                Log.d(TAG, "Sent payload");
+            } catch (MqttException e) {
+                e.printStackTrace();
+                Log.d(TAG, "Error sending payload");
+
+            }
         }
     };
 

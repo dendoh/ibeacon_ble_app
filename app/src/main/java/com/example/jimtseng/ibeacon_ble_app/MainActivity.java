@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 import android.util.TimeUtils;
+import android.widget.TextView;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.android.service.MqttService;
@@ -36,10 +37,13 @@ public class MainActivity extends AppCompatActivity {
     final String topic = "test";
     private String clientID = MqttClient.generateClientId();
     private MqttAndroidClient client;
+    private TextView LogTextView;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        LogTextView = (TextView)findViewById(R.id.logtextid);
+        LogTextView.setText("Start logging\n");
         final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         Log.d(TAG, "getting BT adapter....");
         mBluetoothAdapter = bluetoothManager.getAdapter();
@@ -132,7 +136,8 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "Found device " + device.toString() + "," + "rssi= "+rssi);
             Log.d(TAG, "scanRecord:" + bytesToHex(scanRecord));
             try {
-                String payload = "Device:" + device.toString() + "payload:" + bytesToHex(scanRecord);
+                String payload = String.format("["+ System.currentTimeMillis() + "]" + " Device:" + device.toString() + " Payload:" + bytesToHex(scanRecord) + " rssi:" +rssi+"\n" );
+                LogTextView.append(payload);
                 MqttMessage message = new MqttMessage(payload.getBytes());
                 if(client.isConnected()) {
                     client.publish(topic,payload.getBytes(),0,false);

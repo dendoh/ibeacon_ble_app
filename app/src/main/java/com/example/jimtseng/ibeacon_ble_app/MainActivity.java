@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.util.Log;
+import android.util.TimeUtils;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
 import org.eclipse.paho.android.service.MqttService;
@@ -21,6 +22,8 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
+import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.List;
 import java.lang.StringBuilder;
 import java.lang.String;
@@ -32,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     final String TAG = "iBeaconBLE";
     final String topic = "test";
     private String clientID = MqttClient.generateClientId();
-    private MqttAndroidClient client = new MqttAndroidClient(MainActivity.this, "tcp://192.168.1.238:1883", clientID);
+    private MqttAndroidClient client;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
         mBluetoothAdapter = bluetoothManager.getAdapter();
         Log.d(TAG, "connecting mqtt broker");
         try {
+            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.238:1883", clientID);
             IMqttToken token = client.connect();
             token.setActionCallback(new IMqttActionListener() {
                 @Override
@@ -59,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
             });
         } catch (MqttException e) {
             e.printStackTrace();
+            Log.d(TAG,"connect() has exception");
         }
     }
     @Override
@@ -90,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        client.close();
         super.onDestroy();
     }
 
@@ -127,9 +133,12 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "scanRecord:" + bytesToHex(scanRecord));
             try {
                 String payload = "Device:" + device.toString() + "payload:" + bytesToHex(scanRecord);
-                MqttMessage message = new MqttMessage("test payload".getBytes());
-                client.publish(topic, message);
-                Log.d(TAG, "Sent payload");
+                MqttMessage message = new MqttMessage(payload.getBytes());
+                if(client.isConnected()) {
+                    client.publish(topic,payload.getBytes(),0,false);
+                 //   client.publish(topic, message);
+                    Log.d(TAG, "Sent payload");
+                }
             } catch (MqttException e) {
                 e.printStackTrace();
                 Log.d(TAG, "Error sending payload");

@@ -2,6 +2,15 @@ package com.example.jimtseng.ibeacon_ble_app;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
@@ -25,6 +34,7 @@ import java.io.ByteArrayInputStream;
 import java.io.UnsupportedEncodingException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.List;
 import java.lang.StringBuilder;
 import java.lang.String;
@@ -32,7 +42,12 @@ import java.lang.String;
 public class MainActivity extends AppCompatActivity {
 
     private BluetoothAdapter mBluetoothAdapter;
+    private BluetoothLeScanner mLEScanner;
+    private ScanSettings settings;
+    private List<ScanFilter> filters;
+    private BluetoothGatt mGatt;
     private Handler mHandler;
+    private ScanResult SharedScanResult;
     final String TAG = "iBeaconBLE";
     final String topic = "test";
     private String clientID = MqttClient.generateClientId();
@@ -44,9 +59,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         LogTextView = (TextView)findViewById(R.id.logtextid);
         LogTextView.setText("Start logging\n");
+        mHandler = new Handler();
         final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         Log.d(TAG, "getting BT adapter....");
         mBluetoothAdapter = bluetoothManager.getAdapter();
+        mLEScanner = mBluetoothAdapter.getBluetoothLeScanner();
+        settings = new ScanSettings.Builder()
+                .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+                .build();
+        filters = new ArrayList<ScanFilter>();
         Log.d(TAG, "connecting mqtt broker");
         try {
             client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.238:1883", clientID);
@@ -114,20 +135,13 @@ public class MainActivity extends AppCompatActivity {
     private void scanLeDevice(boolean enable) {
         Log.d(TAG, "scanLeDevice enable="+enable);
         if(enable){
-      //      Log.d(TAG,"Scheduling stopscan");
-      //      mHandler.postDelayed(new Runnable() {
-      //          @Override
-      //          public void run() {
-      //              Log.d(TAG,"Delayed Stopping scan");
-      //              mBluetoothAdapter.stopLeScan(mLeScanCallback);
-
-      //          }
-      //      }, 10000);
             Log.d(TAG, "Starting scan");
-            mBluetoothAdapter.startLeScan(mLeScanCallback);
+            mLEScanner.startScan(filters,settings,mLEScanCallback_new);
+           // mBluetoothAdapter.startLeScan(mLeScanCallback);
         } else {
             Log.d(TAG, "Stopping scan");
-            mBluetoothAdapter.stopLeScan(mLeScanCallback);
+            mLEScanner.stopScan(mLEScanCallback_new);
+           // mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
     }
     private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
@@ -152,10 +166,43 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+private ScanCallback mLEScanCallback_new = new ScanCallback() {
+    @Override
+    public void onScanResult(int callbackType, ScanResult result) {
+        SharedScanResult = result;
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                String payload = String.format(
+                        "[TimeTAG]" + SharedScanResult.getTimestampNanos()
+                                +" BLEDevice:" + SharedScanResult.getDevice().toString()
+                                + " Record:" + bytesToHex(SharedScanResult.getScanRecord().getBytes())
+                                + " rssi:" + SharedScanResult.getRssi()
+                                + "\n");
+                Log.d(TAG, payload);
+                LogTextView.append(payload);
+            }
+        });
+      //  Log.d(TAG, "BLEDevice:" + result.getDevice().toString() + " Record:" + bytesToHex(result.getScanRecord().getBytes()) + " rssi:" + result.getRssi());
+    }
+
+    @Override
+    public void onBatchScanResults(List<ScanResult> results) {
+        for (ScanResult sr : results) {
+            Log.d(TAG, "[Batch]BLEDevice:" + sr.getDevice().toString() + " Record:" + bytesToHex(sr.getScanRecord().getBytes()) + " rssi:" + sr.getRssi());
+        }
+    }
+
+    @Override
+    public void onScanFailed(int errorCode) {
+        Log.e(TAG,"Scan error code:"+errorCode);
+    }
+};
+
     private static String bytesToHex(byte[] in) {
         final StringBuilder builder = new StringBuilder();
         for(byte b : in) {
-            builder.append(String.format("%02x", b));
+            builder.append(String.format("0x%02x,", b));
         }
         return builder.toString();
     }

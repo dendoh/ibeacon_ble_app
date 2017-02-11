@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private ScanResult SharedScanResult;
     final String TAG = "iBeaconBLE";
-    final String topic = "test";
+    String topic = "test";
     private String clientID = MqttClient.generateClientId();
     private MqttAndroidClient client;
     private TextView LogTextView;
@@ -70,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
         filters = new ArrayList<ScanFilter>();
         Log.d(TAG, "connecting mqtt broker");
         try {
-            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.238:1883", clientID);
+            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.195:1883", clientID);
             IMqttToken token = client.connect();
             token.setActionCallback(new IMqttActionListener() {
                 @Override
@@ -173,14 +173,31 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                String payload = String.format(
+                String payload_for_log = String.format(
                         "[TimeTAG]" + SharedScanResult.getTimestampNanos()
                                 +" BLEDevice:" + SharedScanResult.getDevice().toString()
                                 + " Record:" + bytesToHex(SharedScanResult.getScanRecord().getBytes())
                                 + " rssi:" + SharedScanResult.getRssi()
                                 + "\n");
-                Log.d(TAG, payload);
-                LogTextView.append(payload);
+                String payload_for_mqtt = String.format(
+                        SharedScanResult.getTimestampNanos()
+                                +"," + SharedScanResult.getDevice().toString()
+                                + "," + bytesToHex(SharedScanResult.getScanRecord().getBytes())
+                                + "," + SharedScanResult.getRssi());
+                topic = "Air sensor/0"; //ToDo: Use paired atmotube MAC ID as topic
+                Log.d(TAG, payload_for_log);
+                LogTextView.append(payload_for_log);
+                try {
+                    MqttMessage message = new MqttMessage(payload_for_mqtt.getBytes());
+                    if(client.isConnected()) {
+                        client.publish(topic,payload_for_mqtt.getBytes(),0,false);
+                        Log.d(TAG, "Sent payload");
+                    }
+                } catch (MqttException e) {
+                    e.printStackTrace();
+                    Log.d(TAG, "Error sending payload");
+
+                }
             }
         });
       //  Log.d(TAG, "BLEDevice:" + result.getDevice().toString() + " Record:" + bytesToHex(result.getScanRecord().getBytes()) + " rssi:" + result.getRssi());
@@ -202,7 +219,7 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
     private static String bytesToHex(byte[] in) {
         final StringBuilder builder = new StringBuilder();
         for(byte b : in) {
-            builder.append(String.format("0x%02x,", b));
+            builder.append(String.format("0x%02x-", b));
         }
         return builder.toString();
     }

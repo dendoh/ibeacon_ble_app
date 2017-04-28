@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler mHandler;
     private ScanResult SharedScanResult;
     final String TAG = "iBeaconBLE";
-    String topic = "test";
+    String topic = "AirSensor";
     private String clientID = MqttClient.generateClientId();
     private MqttAndroidClient client;
     private TextView LogTextView;
@@ -184,7 +184,7 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
                                 +"," + SharedScanResult.getDevice().toString()
                                 + "," + bytesToHex(SharedScanResult.getScanRecord().getBytes())
                                 + "," + SharedScanResult.getRssi());
-                topic = "Air sensor/0"; //ToDo: Use paired atmotube MAC ID as topic
+                topic = "AirSensor/0"; //ToDo: Use paired atmotube MAC ID as topic
                 Log.d(TAG, payload_for_log);
                 LogTextView.append(payload_for_log);
                 try {

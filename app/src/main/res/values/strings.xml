@@ -1,3 +1,34 @@
 <resources>
     <string name="app_name">ibeacon_ble_app</string>
+    <string-array name="beacons">
+        <item>E6:A7:D8:92:8A:2C</item>
+        <item>CC:E2:29:71:29:B2</item>
+        <item>E2:A3:D4:8E:86:28</item>
+        <item>EE:8D:87:39:0A:52</item>
+        <item>CF:07:C3:58:72:92</item>
+        <item>F0:C5:99:9C:05:9F</item>
+        <item>FC:72:81:C9:68:53</item>
+        <item>F8:57:3D:13:3B:AA</item>
+        <item>C4:B0:9C:C7:CD:71</item>
+        <item>F1:2D:28:CD:8B:A2</item>
+        <item>D9:66:AC:42:A9:CF</item>
+        <item>D8:A9:51:E3:CE:26</item>
+        <item>E7:9F:5A:BF:EE:E2</item>
+        <item>EF:4D:2F:54:4A:EE</item>
+        <item>C4:C9:F9:1E:4B:57</item>
+        <item>F7:EB:90:D2:AE:84</item>
+        <item>D3:E7:4D:CA:16:5A</item>
+        <item>EE:3B:66:D5:EC:6A</item>
+        <item>F9:70:56:B8:E3:28</item>
+        <item>C0:F0:EE:32:E4:F7</item>
+        <item>D5:23:00:F1:1F:4E</item>
+        <item>C2:BA:09:39:96:A1</item>
+        <item>F7:DE:72:BE:2D:08</item>
+        <item>D1:E4:56:D6:79:A0</item>
+        <item>C6:7E:93:A0:46:08</item>
+        <item>CB:67:18:D1:BB:66</item>
+        <item>F1:43:C5:90:4B:D4</item>
+        <item>CF:EB:06:68:39:B4</item>
+        <item>C6:E5:67:09:65:D1</item>
+    </string-array>
 </resources>

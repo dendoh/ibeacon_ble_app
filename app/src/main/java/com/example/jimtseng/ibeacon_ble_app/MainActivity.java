@@ -1,5 +1,6 @@
 package com.example.jimtseng.ibeacon_ble_app;
 
+import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothGatt;
@@ -13,7 +14,11 @@ import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.res.Resources;
+import android.os.Build;
 import android.os.Handler;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.bluetooth.BluetoothAdapter;
@@ -41,10 +46,11 @@ import java.lang.String;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int REQUEST_CODE_COARSE = 2528;
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeScanner mLEScanner;
     private ScanSettings settings;
-    private List<ScanFilter> filters;
+    private List<ScanFilter> filters = new ArrayList<>();
     private BluetoothGatt mGatt;
     private Handler mHandler;
     private ScanResult SharedScanResult;
@@ -53,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
     private String clientID = MqttClient.generateClientId();
     private MqttAndroidClient client;
     private TextView LogTextView;
+    private ScanFilter beacon_filter;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
         LogTextView = (TextView)findViewById(R.id.logtextid);
         LogTextView.setText("Start logging\n");
         mHandler = new Handler();
+        ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},REQUEST_CODE_COARSE);
         final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         Log.d(TAG, "getting BT adapter....");
         mBluetoothAdapter = bluetoothManager.getAdapter();
@@ -67,11 +75,22 @@ public class MainActivity extends AppCompatActivity {
         settings = new ScanSettings.Builder()
                 .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                 .build();
-        filters = new ArrayList<ScanFilter>();
-        Log.d(TAG, "connecting mqtt broker");
+        Resources res = getResources();
+        String beacons_array[] = res.getStringArray(R.array.beacons);
+        for (String beacon : beacons_array) {
+            beacon_filter = new ScanFilter.Builder().setDeviceAddress(beacon).build();
+            if (mBluetoothAdapter.checkBluetoothAddress(beacon)) {
+                Log.d(TAG, "valid beacon addr");
+            } else {
+                Log.d(TAG, "invalid beacon addr");
+            }
+            Log.d(TAG, "Adding filter<" + beacon + ">");
+            filters.add(beacon_filter);
+        }
         try {
-            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.195:1883", clientID);
+            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.105:1883", clientID);
             IMqttToken token = client.connect();
+            Log.d(TAG, "connecting mqtt broker");
             token.setActionCallback(new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
@@ -95,19 +114,28 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart(){
         super.onStart();
         Log.d(TAG,"onStart...");
-        scanLeDevice(true);
+       // scanLeDevice(true);
     }
 
     @Override
-    protected void onResume(){
+    protected void onResume() {
         super.onResume();
-        Log.d(TAG,"onResume...");
+        Log.d(TAG, "onResume...");
         if (mBluetoothAdapter == null || !mBluetoothAdapter.isEnabled()) {
             Log.d(TAG, "BT is not enabled, requesting to enable");
             Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivityForResult(enableBtIntent, 1);
+            finish();
+        } else {
+            if(Build.VERSION.SDK_INT >= 23) {
+                if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    scanLeDevice(true);
+                }
+            } else {
+                scanLeDevice(true);
+            }
         }
-        scanLeDevice(true);
     }
 
     @Override
@@ -144,27 +172,6 @@ public class MainActivity extends AppCompatActivity {
            // mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
     }
-    private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
-        @Override
-        public void onLeScan(BluetoothDevice device, int rssi, byte[] scanRecord) {
-            Log.d(TAG, "Found device " + device.toString() + "," + "rssi= "+rssi);
-            Log.d(TAG, "scanRecord:" + bytesToHex(scanRecord));
-            try {
-                String payload = String.format("["+ System.currentTimeMillis() + "]" + " Device:" + device.toString() + " Payload:" + bytesToHex(scanRecord) + " rssi:" +rssi+"\n" );
-                LogTextView.append(payload);
-                MqttMessage message = new MqttMessage(payload.getBytes());
-                if(client.isConnected()) {
-                    client.publish(topic,payload.getBytes(),0,false);
-                 //   client.publish(topic, message);
-                    Log.d(TAG, "Sent payload");
-                }
-            } catch (MqttException e) {
-                e.printStackTrace();
-                Log.d(TAG, "Error sending payload");
-
-            }
-        }
-    };
 
 private ScanCallback mLEScanCallback_new = new ScanCallback() {
     @Override
@@ -222,5 +229,14 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
             builder.append(String.format("0x%02x-", b));
         }
         return builder.toString();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if(grantResults[0]== PackageManager.PERMISSION_GRANTED){
+            Log.v(TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
+            //resume tasks needing this permission
+        }
     }
 }

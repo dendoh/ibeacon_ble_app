@@ -88,7 +88,7 @@ public class MainActivity extends AppCompatActivity {
             filters.add(beacon_filter);
         }
         try {
-            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.105:1883", clientID);
+            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://10.0.0.16:1883", clientID); //Mauzone:10.0.0.16:1883
             IMqttToken token = client.connect();
             Log.d(TAG, "connecting mqtt broker");
             token.setActionCallback(new IMqttActionListener() {
@@ -180,6 +180,7 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                byte scanrecord[] = SharedScanResult.getScanRecord().getBytes();
                 String payload_for_log = String.format(
                         "[TimeTAG]" + SharedScanResult.getTimestampNanos()
                                 +" BLEDevice:" + SharedScanResult.getDevice().toString()
@@ -190,20 +191,26 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
                         SharedScanResult.getTimestampNanos()
                                 +"," + SharedScanResult.getDevice().toString()
                                 + "," + bytesToHex(SharedScanResult.getScanRecord().getBytes())
-                                + "," + SharedScanResult.getRssi());
+                                + "," + SharedScanResult.getRssi()
+                                + "," + (int) scanrecord[29]);
                 topic = "AirSensor/0"; //ToDo: Use paired atmotube MAC ID as topic
                 Log.d(TAG, payload_for_log);
                 LogTextView.append(payload_for_log);
-                try {
-                    MqttMessage message = new MqttMessage(payload_for_mqtt.getBytes());
-                    if(client.isConnected()) {
-                        client.publish(topic,payload_for_mqtt.getBytes(),0,false);
-                        Log.d(TAG, "Sent payload");
-                    }
-                } catch (MqttException e) {
-                    e.printStackTrace();
-                    Log.d(TAG, "Error sending payload");
+                if(scanrecord[4] == (byte) 0xff && scanrecord[5] == (byte) 0x4c) {  //send via mqtt only when ibeacons are found
+                    Log.d(TAG, "ibeacon found");
+                    try {
+                        MqttMessage message = new MqttMessage(payload_for_mqtt.getBytes());
+                        if (client.isConnected()) {
+                            client.publish(topic, payload_for_mqtt.getBytes(), 0, false);
+                            Log.d(TAG, "Sent payload");
+                        }
+                    } catch (MqttException e) {
+                        e.printStackTrace();
+                        Log.d(TAG, "Error sending payload");
 
+                    }
+                } else {
+                    Log.d(TAG, String.format("not an ibeacon, [4]=0x%x,[5]=0x%x", scanrecord[4],scanrecord[5]));
                 }
             }
         });

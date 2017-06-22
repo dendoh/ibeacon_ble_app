@@ -25,6 +25,8 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 import android.util.TimeUtils;
+import android.view.View;
+import android.widget.RadioButton;
 import android.widget.TextView;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
@@ -58,14 +60,29 @@ public class MainActivity extends AppCompatActivity {
     String topic = "AirSensor";
     private String clientID = MqttClient.generateClientId();
     private MqttAndroidClient client;
-    private TextView LogTextView;
+    private TextView LogTextView, StatusTextView;
+    private TextView RadioTextView[];
     private ScanFilter beacon_filter;
+    private boolean StartDiscovery = false;
+    private String CurrentTubeMAC;
+    private int tubecount = 0;
+    private String[] TubesMAC = new String[4];
+    private String BoundTubeMAC = null;
+    private boolean BoundComplete = false;
+    private int voc;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        RadioTextView = new TextView[4];
         LogTextView = (TextView)findViewById(R.id.logtextid);
+        StatusTextView = (TextView)findViewById(R.id.StatusView);
+        RadioTextView[0] = (TextView)findViewById(R.id.radioButton0);
+        RadioTextView[1] = (TextView)findViewById(R.id.radioButton1);
+        RadioTextView[2] = (TextView)findViewById(R.id.radioButton2);
+        RadioTextView[3] = (TextView)findViewById(R.id.radioButton3);
         LogTextView.setText("Start logging\n");
+        StatusTextView.setText("Scan stopped");
         mHandler = new Handler();
         ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_COARSE_LOCATION},REQUEST_CODE_COARSE);
         final BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
@@ -88,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
             filters.add(beacon_filter);
         }
         try {
-            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://10.0.0.16:1883", clientID); //Mauzone:10.0.0.16:1883
+            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.105:1883", clientID); //Mauzone:10.0.0.16:1883
             IMqttToken token = client.connect();
             Log.d(TAG, "connecting mqtt broker");
             token.setActionCallback(new IMqttActionListener() {
@@ -160,6 +177,7 @@ public class MainActivity extends AppCompatActivity {
                   return;
               }
     }
+
     private void scanLeDevice(boolean enable) {
         Log.d(TAG, "scanLeDevice enable="+enable);
         if(enable){
@@ -173,7 +191,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-private ScanCallback mLEScanCallback_new = new ScanCallback() {
+    private ScanCallback mLEScanCallback_new = new ScanCallback() {
     @Override
     public void onScanResult(int callbackType, ScanResult result) {
         SharedScanResult = result;
@@ -181,36 +199,52 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
             @Override
             public void run() {
                 byte scanrecord[] = SharedScanResult.getScanRecord().getBytes();
-                String payload_for_log = String.format(
-                        "[TimeTAG]" + SharedScanResult.getTimestampNanos()
-                                +" BLEDevice:" + SharedScanResult.getDevice().toString()
-                                + " Record:" + bytesToHex(SharedScanResult.getScanRecord().getBytes())
-                                + " rssi:" + SharedScanResult.getRssi()
-                                + "\n");
-                String payload_for_mqtt = String.format(
-                        SharedScanResult.getTimestampNanos()
-                                +"," + SharedScanResult.getDevice().toString()
-                                + "," + bytesToHex(SharedScanResult.getScanRecord().getBytes())
-                                + "," + SharedScanResult.getRssi()
-                                + "," + (int) scanrecord[29]);
-                topic = "AirSensor/0"; //ToDo: Use paired atmotube MAC ID as topic
-                Log.d(TAG, payload_for_log);
-                LogTextView.append(payload_for_log);
-                if(scanrecord[4] == (byte) 0xff && scanrecord[5] == (byte) 0x4c) {  //send via mqtt only when ibeacons are found
-                    Log.d(TAG, "ibeacon found");
-                    try {
-                        MqttMessage message = new MqttMessage(payload_for_mqtt.getBytes());
-                        if (client.isConnected()) {
-                            client.publish(topic, payload_for_mqtt.getBytes(), 0, false);
-                            Log.d(TAG, "Sent payload");
-                        }
-                    } catch (MqttException e) {
-                        e.printStackTrace();
-                        Log.d(TAG, "Error sending payload");
-
+                if(isTube(scanrecord)) {
+                    Log.d(TAG, "Atmotube found!!");
+                    LogTextView.append("Tube found!!");
+                    if(StartDiscovery && !BoundComplete) {
+                        CurrentTubeMAC = SharedScanResult.getDevice().toString();
+                        RadioTextView[tubecount].setText(CurrentTubeMAC);
+                        TubesMAC[tubecount] = CurrentTubeMAC;
+                        if (++tubecount >= 4)
+                            tubecount = 0;
+                    } else if(BoundComplete) {
+                        voc = (int) ((scanrecord[25] & 0xFF) << 8) | (scanrecord[26] & 0xFF);
+                        StatusTextView.setText(String.format("Tube: %s, voc = %d",BoundTubeMAC, voc));
                     }
-                } else {
-                    Log.d(TAG, String.format("not an ibeacon, [4]=0x%x,[5]=0x%x", scanrecord[4],scanrecord[5]));
+
+                } else if(BoundComplete){
+                    String payload_for_log = String.format(
+                            "[TimeTAG]" + SharedScanResult.getTimestampNanos()
+                                    + " BLEDevice:" + SharedScanResult.getDevice().toString()
+                                    + " Record:" + bytesToHex(SharedScanResult.getScanRecord().getBytes())
+                                    + " rssi:" + SharedScanResult.getRssi()
+                                    + "\n");
+                    String payload_for_mqtt = String.format(BoundTubeMAC
+                                    + "," + SharedScanResult.getDevice().toString()
+                                    + "," + bytesToHex(SharedScanResult.getScanRecord().getBytes())
+                                    + "," + SharedScanResult.getRssi()
+                                    + "," + (int) scanrecord[29]
+                                    + "," + voc);
+                    topic = "AirSensor";
+                    Log.d(TAG, payload_for_log);
+                    LogTextView.append(payload_for_log);
+                    if (scanrecord[4] == (byte) 0xff && scanrecord[5] == (byte) 0x4c) {  //send via mqtt only when ibeacons are found
+                        Log.d(TAG, "ibeacon found");
+                        try {
+                            MqttMessage message = new MqttMessage(payload_for_mqtt.getBytes());
+                            if (client.isConnected()) {
+                                client.publish(topic, payload_for_mqtt.getBytes(), 0, false);
+                                Log.d(TAG, "Sent payload");
+                            }
+                        } catch (MqttException e) {
+                            e.printStackTrace();
+                            Log.d(TAG, "Error sending payload");
+
+                        }
+                    } else {
+                        Log.d(TAG, String.format("not an ibeacon, [4]=0x%x,[5]=0x%x", scanrecord[4], scanrecord[5]));
+                    }
                 }
             }
         });
@@ -230,6 +264,11 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
     }
 };
 
+    private boolean isTube(byte[] scanrecord) {
+        String stringScanrecord = new String(scanrecord);
+        return stringScanrecord.contains("ATMOTUBE");
+    }
+
     private static String bytesToHex(byte[] in) {
         final StringBuilder builder = new StringBuilder();
         for(byte b : in) {
@@ -245,5 +284,51 @@ private ScanCallback mLEScanCallback_new = new ScanCallback() {
             Log.v(TAG,"Permission: "+permissions[0]+ "was "+grantResults[0]);
             //resume tasks needing this permission
         }
+    }
+
+
+    public void OnRadioButtonClicked(View view) {
+        boolean checked = ((RadioButton) view).isChecked();
+        switch(view.getId()) {
+            case R.id.radioButton0:
+                if(checked) {
+                    Log.d(TAG,"Tube" + TubesMAC[0] + "is selected");
+                    BoundTubeMAC = TubesMAC[0];
+                    BoundComplete = true;
+                }
+                break;
+            case R.id.radioButton1:
+                if(checked) {
+                    Log.d(TAG,"Tube" + TubesMAC[1] + "is selected");
+                    BoundTubeMAC = TubesMAC[1];
+                    BoundComplete = true;
+                }
+                break;
+            case R.id.radioButton2:
+                if(checked) {
+                    Log.d(TAG,"Tube" + TubesMAC[2] + "is selected");
+                    BoundTubeMAC = TubesMAC[2];
+                    BoundComplete = true;
+                }
+                break;
+            case R.id.radioButton3:
+                if(checked) {
+                    Log.d(TAG,"Tube" + TubesMAC[3] + "is selected");
+                    BoundTubeMAC = TubesMAC[3];
+                    BoundComplete = true;
+                }
+                break;
+        }
+    }
+
+    public void OnStartClicked(View view) {
+        StartDiscovery = true;
+        StatusTextView.setText("Scan started");
+    }
+
+
+    public void OnStopClicked(View view) {
+        StartDiscovery = false;
+        StatusTextView.setText("Scan stopped");
     }
 }

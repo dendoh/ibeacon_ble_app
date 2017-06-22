@@ -105,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
             filters.add(beacon_filter);
         }
         try {
-            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://192.168.1.105:1883", clientID); //Mauzone:10.0.0.16:1883
+            client = new MqttAndroidClient(this.getApplicationContext(), "tcp://10.0.0.16:1883", clientID); //Mauzone:10.0.0.16:1883
             IMqttToken token = client.connect();
             Log.d(TAG, "connecting mqtt broker");
             token.setActionCallback(new IMqttActionListener() {
@@ -291,28 +291,28 @@ public class MainActivity extends AppCompatActivity {
         boolean checked = ((RadioButton) view).isChecked();
         switch(view.getId()) {
             case R.id.radioButton0:
-                if(checked) {
+                if(checked && TubesMAC[0]!= null) {
                     Log.d(TAG,"Tube" + TubesMAC[0] + "is selected");
                     BoundTubeMAC = TubesMAC[0];
                     BoundComplete = true;
                 }
                 break;
             case R.id.radioButton1:
-                if(checked) {
+                if(checked && TubesMAC[1]!= null) {
                     Log.d(TAG,"Tube" + TubesMAC[1] + "is selected");
                     BoundTubeMAC = TubesMAC[1];
                     BoundComplete = true;
                 }
                 break;
             case R.id.radioButton2:
-                if(checked) {
+                if(checked && TubesMAC[2]!= null) {
                     Log.d(TAG,"Tube" + TubesMAC[2] + "is selected");
                     BoundTubeMAC = TubesMAC[2];
                     BoundComplete = true;
                 }
                 break;
             case R.id.radioButton3:
-                if(checked) {
+                if(checked && TubesMAC[3]!= null) {
                     Log.d(TAG,"Tube" + TubesMAC[3] + "is selected");
                     BoundTubeMAC = TubesMAC[3];
                     BoundComplete = true;

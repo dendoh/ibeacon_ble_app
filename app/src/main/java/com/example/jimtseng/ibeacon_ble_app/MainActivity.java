@@ -18,6 +18,7 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.os.Build;
 import android.os.Handler;
+import android.support.annotation.IdRes;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -27,6 +28,7 @@ import android.util.Log;
 import android.util.TimeUtils;
 import android.view.View;
 import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
@@ -70,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
     private String BoundTubeMAC = null;
     private boolean BoundComplete = false;
     private int voc;
+    private RadioGroup MyRadioGroup;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -81,6 +84,51 @@ public class MainActivity extends AppCompatActivity {
         RadioTextView[1] = (TextView)findViewById(R.id.radioButton1);
         RadioTextView[2] = (TextView)findViewById(R.id.radioButton2);
         RadioTextView[3] = (TextView)findViewById(R.id.radioButton3);
+        MyRadioGroup = (RadioGroup)findViewById(R.id.radioGroup);
+        MyRadioGroup.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(RadioGroup radioGroup, @IdRes int i) {
+                switch (i){
+                    case R.id.radioButton0:
+                        if(TubesMAC[0]!= null) {
+                            Log.d(TAG,"Tube" + TubesMAC[0] + "is selected");
+                            StatusTextView.setText(TubesMAC[0]+"selected");
+                            BoundTubeMAC = TubesMAC[0];
+                            BoundComplete = true;
+                            DisableRadioGroup();
+                        }
+                        break;
+                    case R.id.radioButton1:
+                        if(TubesMAC[1]!= null) {
+                            Log.d(TAG,"Tube" + TubesMAC[1] + "is selected");
+                            StatusTextView.setText(TubesMAC[1]+"selected");
+                            BoundTubeMAC = TubesMAC[1];
+                            BoundComplete = true;
+                            DisableRadioGroup();
+                        }
+                        break;
+                    case R.id.radioButton2:
+                        if(TubesMAC[2]!= null) {
+                            Log.d(TAG,"Tube" + TubesMAC[2] + "is selected");
+                            StatusTextView.setText(TubesMAC[2]+"selected");
+                            BoundTubeMAC = TubesMAC[2];
+                            BoundComplete = true;
+                            DisableRadioGroup();
+                        }
+                        break;
+                    case R.id.radioButton3:
+                        if(TubesMAC[3]!= null) {
+                            Log.d(TAG,"Tube" + TubesMAC[3] + "is selected");
+                            StatusTextView.setText(TubesMAC[3]+"selected");
+                            BoundTubeMAC = TubesMAC[3];
+                            BoundComplete = true;
+                            DisableRadioGroup();
+                        }
+                        break;
+                }
+            }
+        });
+
         LogTextView.setText("Start logging\n");
         StatusTextView.setText("Scan stopped");
         mHandler = new Handler();
@@ -107,6 +155,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             client = new MqttAndroidClient(this.getApplicationContext(), "tcp://10.0.0.16:1883", clientID); //Mauzone:10.0.0.16:1883
             IMqttToken token = client.connect();
+            Log.d(TAG,"token="+token.toString());
             Log.d(TAG, "connecting mqtt broker");
             token.setActionCallback(new IMqttActionListener() {
                 @Override
@@ -123,9 +172,10 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         } catch (MqttException e) {
-            e.printStackTrace();
             Log.d(TAG,"connect() has exception");
+            e.printStackTrace();
         }
+        Log.d(TAG,"onCreate exits");
     }
     @Override
     protected void onStart(){
@@ -287,7 +337,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void OnRadioButtonClicked(View view) {
+/*    public void OnRadioButtonClicked(View view) {
         boolean checked = ((RadioButton) view).isChecked();
         switch(view.getId()) {
             case R.id.radioButton0:
@@ -320,7 +370,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
     }
-
+*/
     public void OnStartClicked(View view) {
         StartDiscovery = true;
         StatusTextView.setText("Scan started");
@@ -330,5 +380,11 @@ public class MainActivity extends AppCompatActivity {
     public void OnStopClicked(View view) {
         StartDiscovery = false;
         StatusTextView.setText("Scan stopped");
+    }
+
+    public void DisableRadioGroup() {
+        for(int i = 0;i < MyRadioGroup.getChildCount();i++){
+            ((RadioButton)MyRadioGroup.getChildAt(i)).setEnabled(false);
+        }
     }
 }
